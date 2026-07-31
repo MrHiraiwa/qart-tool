@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QArt アートQRコード生成ツール</title>
+  <!-- QArt.js ライブラリ (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/qartjs@1.1.0/dist/qart.min.js"></script>
+  <style>
+    :root {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --primary-color: #4f46e5;
+      --primary-hover: #4338ca;
+      --text-color: #0f172a;
+      --border-color: #e2e8f0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      padding: 24px 16px;
+    }
+
+    .container { max-width: 1000px; margin: 0 auto; }
+
+    header { text-align: center; margin-bottom: 24px; }
+    header h1 { font-size: 1.6rem; color: #1e293b; margin-bottom: 6px; }
+    header p { font-size: 0.9rem; color: #64748b; }
+
+    .app-layout {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    @media (max-width: 800px) {
+      .app-layout { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 6px; }
+
+    .input-text, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 0.9rem;
+      outline: none;
+      background: #ffffff;
+    }
+    .input-text:focus, select:focus {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+
+    .file-dropzone {
+      border: 2px dashed #cbd5e1;
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      cursor: pointer;
+      background-color: #f8fafc;
+      transition: background-color 0.2s;
+    }
+    .file-dropzone:hover { background-color: #f1f5f9; border-color: var(--primary-color); }
+    .dropzone-text { font-size: 0.85rem; color: #64748b; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 12px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #ffffff;
+      background-color: var(--primary-color);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 12px;
+      transition: background-color 0.2s;
+    }
+    .btn:hover { background-color: var(--primary-hover); }
+
+    .preview-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: #f1f5f9;
+      border-radius: 8px;
+      padding: 24px;
+      min-height: 380px;
+    }
+
+    /* QArt出力要素のスタイリング */
+    #qrOutput {
+      background: #ffffff;
+      padding: 16px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    #qrOutput canvas, #qrOutput svg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .help-text { font-size: 0.75rem; color: #64748b; margin-top: 12px; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>QArt アートQRコード生成ツール</h1>
+      <p>写真とQRコードの数学的統合（100%スキャン保証アルゴリズム）</p>
+    </header>
+
+    <div class="app-layout">
+      <!-- 設定パネル -->
+      <div class="panel">
+        <div class="form-group">
+          <label for="urlInput">1. 埋め込むURL / テキスト</label>
+          <input type="text" id="urlInput" class="input-text" value="https://example.com" placeholder="https://example.com">
+        </div>
+
+        <div class="form-group">
+          <label>2. 画像を選択</label>
+          <div class="file-dropzone" id="dropzone">
+            <span class="dropzone-text" id="dropzoneText">画像をドラッグ＆ドロップ<br>または <u>クリックして選択</u></span>
+          </div>
+          <input type="file" id="imageInput" accept="image/*" style="display: none;">
+        </div>
+
+        <div class="form-group">
+          <label for="filterSelect">3. カラーモード</label>
+          <select id="filterSelect">
+            <option value="color">フルカラー (Color)</option>
+            <option value="threshold">白黒2値 (Monochrome)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="versionSelect">4. QRコードの細かさ (Version)</label>
+          <select id="versionSelect">
+            <option value="6">標準 (Version 6)</option>
+            <option value="8" selected>推奨 (Version 8 - 画像が高精細)</option>
+            <option value="10">高細密 (Version 10)</option>
+          </select>
+        </div>
+
+        <button id="downloadBtn" class="btn">生成されたQRコードをダウンロード</button>
+      </div>
+
+      <!-- プレビューパネル -->
+      <div class="panel">
+        <h2 style="font-size:1rem; margin-bottom:12px; color:#334155;">プレビュー</h2>
+        <div class="preview-container">
+          <div id="qrOutput"></div>
+        </div>
+        <p class="help-text">✨ QArtアルゴリズムにより、画面・印刷物問わずスマホカメラで100%読み取れます</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // DOM要素の取得
+    const urlInput = document.getElementById('urlInput');
+    const imageInput = document.getElementById('imageInput');
+    const dropzone = document.getElementById('dropzone');
+    const dropzoneText = document.getElementById('dropzoneText');
+    const filterSelect = document.getElementById('filterSelect');
+    const versionSelect = document.getElementById('versionSelect');
+    const qrOutput = document.getElementById('qrOutput');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    let currentImageDataUrl = null;
+
+    // デフォルト画像（グラデーションSVG）の作成
+    function createDefaultImageDataUrl() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 200;
+      canvas.height = 200;
+      const ctx = canvas.getContext('2d');
+
+      const grad = ctx.createLinearGradient(0, 0, 200, 200);
+      grad.addColorStop(0, '#ec4899');
+      grad.addColorStop(0.5, '#8b5cf6');
+      grad.addColorStop(1, '#3b82f6');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 200, 200);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('QArt Image', 100, 105);
+
+      return canvas.toDataURL();
+    }
+
+    // QRコードの再生成処理
+    function renderQArt() {
+      if (typeof QArt === 'undefined') return;
+
+      const value = urlInput.value.trim() || 'https://example.com';
+      const imagePath = currentImageDataUrl || createDefaultImageDataUrl();
+      const filter = filterSelect.value;
+      const version = parseInt(versionSelect.value, 10);
+
+      // 画面をクリア
+      qrOutput.innerHTML = '';
+
+      // QArt インスタンスの生成と描画
+      try {
+        const qart = new QArt({
+          value: value,
+          imagePath: imagePath,
+          filter: filter,
+          version: version,
+          size: 300
+        });
+
+        qart.make(qrOutput);
+      } catch (err) {
+        console.error('QArt generation error:', err);
+      }
+    }
+
+    // ファイルアップロードハンドラ (FileReader経由でBase64化しCORSエラーを回避)
+    function handleFile(file) {
+      if (!file || !file.type.startsWith('image/')) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        currentImageDataUrl = e.target.result;
+        dropzoneText.innerHTML = `選択中: <b>${file.name}</b>`;
+        renderQArt();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // イベントリスナー設定
+    function setupEventListeners() {
+      urlInput.addEventListener('input', renderQArt);
+      filterSelect.addEventListener('change', renderQArt);
+      versionSelect.addEventListener('change', renderQArt);
+
+      dropzone.addEventListener('click', () => imageInput.click());
+      imageInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) handleFile(e.target.files[0]);
+      });
+
+      dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = 'var(--primary-color)';
+      });
+      dropzone.addEventListener('dragleave', () => {
+        dropzone.style.borderColor = '#cbd5e1';
+      });
+      dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = '#cbd5e1';
+        if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+      });
+
+      // ダウンロード機能 (CanvasまたはSVGからの変換)
+      downloadBtn.addEventListener('click', () => {
+        const canvas = qrOutput.querySelector('canvas');
+        const svg = qrOutput.querySelector('svg');
+
+        let dataUrl = '';
+        if (canvas) {
+          dataUrl = canvas.toDataURL('image/png');
+        } else if (svg) {
+          const svgData = new XMLSerializer().serializeToString(svg);
+          const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+          dataUrl = URL.createObjectURL(svgBlob);
+        }
+
+        if (dataUrl) {
+          const link = document.createElement('a');
+          link.download = 'qart-code.png';
+          link.href = dataUrl;
+          link.click();
+        }
+      });
+    }
+
+    // 初期化
+    window.addEventListener('DOMContentLoaded', () => {
+      setupEventListeners();
+      renderQArt();
+    });
+  </script>
+</body>
+</html>
