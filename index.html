@@ -108,18 +108,23 @@
       min-height: 380px;
     }
 
-    /* QArt出力要素のスタイリング */
+    /* プレビュー表示エリア */
     #qrOutput {
       background: #ffffff;
-      padding: 16px;
-      border-radius: 8px;
+      padding: 24px;
+      border-radius: 12px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      display: inline-block;
     }
 
+    /* にじみ防止（解像度くっきり描画設定） */
     #qrOutput canvas, #qrOutput svg {
       display: block;
       max-width: 100%;
       height: auto;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+      image-rendering: pixelated;
     }
 
     .help-text { font-size: 0.75rem; color: #64748b; margin-top: 12px; text-align: center; }
@@ -129,8 +134,8 @@
 
   <div class="container">
     <header>
-      <h1>QArt アートQRコード生成ツール</h1>
-      <p>写真とQRコードの数学的統合（100%スキャン保証アルゴリズム）</p>
+      <h1>QArt アートQRコード生成ツール 🎨✨</h1>
+      <p>写真とQRコードの数学的統合（カラー高精度＆スマート白枠合成）</p>
     </header>
 
     <div class="app-layout">
@@ -152,7 +157,7 @@
         <div class="form-group">
           <label for="filterSelect">3. カラーモード</label>
           <select id="filterSelect">
-            <option value="color">フルカラー (Color)</option>
+            <option value="color" selected>フルカラー (Color) - 高精度推奨</option>
             <option value="threshold">白黒2値 (Monochrome)</option>
           </select>
         </div>
@@ -166,16 +171,16 @@
           </select>
         </div>
 
-        <button id="downloadBtn" class="btn">生成されたQRコードをダウンロード</button>
+        <button id="downloadBtn" class="btn">生成されたQRコードをダウンロード 📥</button>
       </div>
 
       <!-- プレビューパネル -->
       <div class="panel">
-        <h2 style="font-size:1rem; margin-bottom:12px; color:#334155;">プレビュー</h2>
+        <h2 style="font-size:1rem; margin-bottom:12px; color:#334155;">プレビュー 📱</h2>
         <div class="preview-container">
           <div id="qrOutput"></div>
         </div>
-        <p class="help-text">✨ QArtアルゴリズムにより、画面・印刷物問わずスマホカメラで100%読み取れます</p>
+        <p class="help-text">✨ 高解像度レンダリング。ダウンロード時は最適な幅の「白い余白」が自動合成されます。</p>
       </div>
     </div>
   </div>
@@ -193,29 +198,29 @@
 
     let currentImageDataUrl = null;
 
-    // デフォルト画像（グラデーションSVG）の作成
+    // デフォルト画像（高コントラストなグラデーション）
     function createDefaultImageDataUrl() {
       const canvas = document.createElement('canvas');
-      canvas.width = 200;
-      canvas.height = 200;
+      canvas.width = 400;
+      canvas.height = 400;
       const ctx = canvas.getContext('2d');
 
-      const grad = ctx.createLinearGradient(0, 0, 200, 200);
+      const grad = ctx.createLinearGradient(0, 0, 400, 400);
       grad.addColorStop(0, '#ec4899');
       grad.addColorStop(0.5, '#8b5cf6');
       grad.addColorStop(1, '#3b82f6');
       ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 200, 200);
+      ctx.fillRect(0, 0, 400, 400);
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 20px sans-serif';
+      ctx.font = 'bold 36px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('QArt Image', 100, 105);
+      ctx.fillText('QArt Image', 200, 210);
 
       return canvas.toDataURL();
     }
 
-    // QRコードの再生成処理
+    // QRコードのレンダリング処理
     function renderQArt() {
       if (typeof QArt === 'undefined') return;
 
@@ -224,17 +229,15 @@
       const filter = filterSelect.value;
       const version = parseInt(versionSelect.value, 10);
 
-      // 画面をクリア
       qrOutput.innerHTML = '';
 
-      // QArt インスタンスの生成と描画
       try {
         const qart = new QArt({
           value: value,
           imagePath: imagePath,
           filter: filter,
           version: version,
-          size: 300
+          size: 600
         });
 
         qart.make(qrOutput);
@@ -243,7 +246,7 @@
       }
     }
 
-    // ファイルアップロードハンドラ (FileReader経由でBase64化しCORSエラーを回避)
+    // ファイル読み込み処理
     function handleFile(file) {
       if (!file || !file.type.startsWith('image/')) return;
 
@@ -256,17 +259,23 @@
       reader.readAsDataURL(file);
     }
 
-    // イベントリスナー設定
+    // イベントリスナーの一括設定
     function setupEventListeners() {
       urlInput.addEventListener('input', renderQArt);
       filterSelect.addEventListener('change', renderQArt);
       versionSelect.addEventListener('change', renderQArt);
 
+      // ドロップゾーンのクリックイベント
       dropzone.addEventListener('click', () => imageInput.click());
+
+      // ファイルダイアログで画像が選ばれたとき
       imageInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) handleFile(e.target.files[0]);
+        if (e.target.files && e.target.files.length > 0) {
+          handleFile(e.target.files[0]);
+        }
       });
 
+      // ドラッグ＆ドロップイベント
       dropzone.addEventListener('dragover', (e) => {
         e.preventDefault();
         dropzone.style.borderColor = 'var(--primary-color)';
@@ -277,33 +286,42 @@
       dropzone.addEventListener('drop', (e) => {
         e.preventDefault();
         dropzone.style.borderColor = '#cbd5e1';
-        if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          handleFile(e.dataTransfer.files[0]);
+        }
       });
 
-      // ダウンロード機能 (CanvasまたはSVGからの変換)
+      // ダウンロード機能（余白幅を15pxに設定してスッキリ綺麗＆高認識率！）
       downloadBtn.addEventListener('click', () => {
-        const canvas = qrOutput.querySelector('canvas');
-        const svg = qrOutput.querySelector('svg');
+        const sourceCanvas = qrOutput.querySelector('canvas');
+        if (!sourceCanvas) return;
 
-        let dataUrl = '';
-        if (canvas) {
-          dataUrl = canvas.toDataURL('image/png');
-        } else if (svg) {
-          const svgData = new XMLSerializer().serializeToString(svg);
-          const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-          dataUrl = URL.createObjectURL(svgBlob);
-        }
+        // 白枠の太さ（15px：デザイン性を崩さない最適な太さ）
+        const margin = 15; 
+        
+        const outputCanvas = document.createElement('canvas');
+        outputCanvas.width = sourceCanvas.width + (margin * 2);
+        outputCanvas.height = sourceCanvas.height + (margin * 2);
 
-        if (dataUrl) {
-          const link = document.createElement('a');
-          link.download = 'qart-code.png';
-          link.href = dataUrl;
-          link.click();
-        }
+        const ctx = outputCanvas.getContext('2d');
+
+        // 白背景を塗りつぶし
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+
+        // 中央に元のQRを描画
+        ctx.drawImage(sourceCanvas, margin, margin);
+
+        // ダウンロード実行
+        const dataUrl = outputCanvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = 'qart-code.png';
+        link.href = dataUrl;
+        link.click();
       });
     }
 
-    // 初期化
+    // 画面読み込み完了時の初期化
     window.addEventListener('DOMContentLoaded', () => {
       setupEventListeners();
       renderQArt();
